@@ -39,34 +39,61 @@ def upload():
     except Exception:
         threshold = 0.5
 
-    # --- Inference and annotation ---
-    from inference import get_model
-    import supervision as sv
-    model = get_model(model_id="animal-detection-ioduj/2")
-    image = Image.open(filepath).convert("RGB")
-    results = model.infer(image)[0]
-    detections = sv.Detections.from_inference(results)
+    # Get model selection from form
+    model_choice = request.form.get('model', 'roboflow')
 
-    # Filter detections by threshold
-    mask = detections.confidence >= threshold
-    detections = detections[mask]
-
-    box_annotator = sv.BoxAnnotator()
-    label_annotator = sv.LabelAnnotator()
-    annotated_image = box_annotator.annotate(scene=image, detections=detections)
-    annotated_image = label_annotator.annotate(scene=annotated_image, detections=detections)
-
-    # Save annotated image
-    annotated_path = os.path.join(app.config['UPLOAD_FOLDER'], f"annotated_{filename}.png")
-    annotated_image.save(annotated_path)
-
-    # Basic evaluation metrics
-    num_detections = len(detections)
-    avg_confidence = float(detections.confidence.mean()) if num_detections > 0 else 0.0
-    metrics = {
-        'Number of Detections': num_detections,
-        'Average Confidence': f"{avg_confidence:.2f}"
-    }
+    if model_choice == 'roboflow':
+        # --- Roboflow Inference ---
+        from inference import get_model
+        import supervision as sv
+        model = get_model(model_id="animal-detection-ioduj/2")
+        image = Image.open(filepath).convert("RGB")
+        results = model.infer(image)[0]
+        detections = sv.Detections.from_inference(results)
+        # Filter detections by threshold
+        mask = detections.confidence >= threshold
+        detections = detections[mask]
+        box_annotator = sv.BoxAnnotator()
+        label_annotator = sv.LabelAnnotator()
+        annotated_image = box_annotator.annotate(scene=image, detections=detections)
+        annotated_image = label_annotator.annotate(scene=annotated_image, detections=detections)
+        # Save annotated image
+        annotated_path = os.path.join(app.config['UPLOAD_FOLDER'], f"annotated_{filename}.png")
+        annotated_image.save(annotated_path)
+        # Basic evaluation metrics
+        num_detections = len(detections)
+        avg_confidence = float(detections.confidence.mean()) if num_detections > 0 else 0.0
+        metrics = {
+            'Number of Detections': num_detections,
+            'Average Confidence': f"{avg_confidence:.2f}"
+        }
+    else:
+        # --- YOLOv8 Inference ---
+        from ultralytics import YOLO
+        import numpy as np
+        image = Image.open(filepath).convert("RGB")
+        model_path = os.path.join('output_yolo_labeled', 'yolov8_exp', 'weights', 'best.pt')
+        model = YOLO(model_path)
+        results = model.predict(image, conf=threshold, save=False, verbose=False)[0]
+        # Draw boxes and labels
+        annotated_image = np.array(image).copy()
+        for box, score, cls in zip(results.boxes.xyxy.cpu().numpy(), results.boxes.conf.cpu().numpy(), results.boxes.cls.cpu().numpy()):
+            if score >= threshold:
+                x1, y1, x2, y2 = map(int, box)
+                label = model.names[int(cls)]
+                import cv2
+                cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0,255,0), 2)
+                cv2.putText(annotated_image, f'{label} {score:.2f}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+        annotated_image = Image.fromarray(annotated_image)
+        annotated_path = os.path.join(app.config['UPLOAD_FOLDER'], f"annotated_{filename}.png")
+        annotated_image.save(annotated_path)
+        # Metrics
+        num_detections = len(results.boxes)
+        avg_confidence = float(np.mean(results.boxes.conf.cpu().numpy())) if num_detections > 0 else 0.0
+        metrics = {
+            'Number of Detections': num_detections,
+            'Average Confidence': f"{avg_confidence:.2f}"
+        }
 
     return render_template('index.html', result_url=url_for('uploaded_file', filename=os.path.basename(annotated_path)), metrics=metrics)
 
