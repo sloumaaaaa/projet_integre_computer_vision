@@ -95,47 +95,120 @@ def detect_with_roboflow(image_path, threshold):
     
     return annotated_image, num_detections, avg_confidence, detected_classes
 
+def is_video_file(filepath):
+    """Check if file is a video"""
+    video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']
+    ext = os.path.splitext(filepath)[1].lower()
+    return ext in video_extensions
+
+def detect_video_yolov8(video_path, threshold):
+    """Perform detection on video using YOLOv8 model"""
+    from ultralytics import YOLO
+    import cv2
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(script_dir, 'output_yolo_labeled', 'yolov8_exp', 'weights', 'best.pt')
+    model = YOLO(model_path)
+    
+    cap = cv2.VideoCapture(video_path)
+    frame_count = 0
+    detected_classes = set()
+    total_detections = 0
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        results = model.predict(frame, conf=threshold, save=False, verbose=False)[0]
+        for box, score, cls in zip(
+            results.boxes.xyxy.cpu().numpy(), 
+            results.boxes.conf.cpu().numpy(), 
+            results.boxes.cls.cpu().numpy()
+        ):
+            if score >= threshold:
+                label = model.names[int(cls)]
+                detected_classes.add(label.strip().lower())
+                total_detections += 1
+        
+        frame_count += 1
+    
+    cap.release()
+    
+    return frame_count, total_detections, detected_classes
+
 def main():
     if len(sys.argv) < 5:
         print(json.dumps({"error": "Invalid arguments"}))
         sys.exit(1)
     
-    image_path = sys.argv[1]
+    file_path = sys.argv[1]
     model_type = sys.argv[2]
     threshold = float(sys.argv[3])
     show_descriptions = sys.argv[4].lower() == 'true'
     
     try:
-        # Perform detection based on model type
-        if model_type == "roboflow":
-            annotated_image, num_detections, avg_confidence, detected_classes = detect_with_roboflow(image_path, threshold)
-        else:  # yolov8
-            annotated_image, num_detections, avg_confidence, detected_classes = detect_with_yolov8(image_path, threshold)
-        
-        # Save annotated image
-        base_name = os.path.basename(image_path)
-        name_without_ext = os.path.splitext(base_name)[0]
-        annotated_filename = f"annotated_{name_without_ext}.png"
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        annotated_path = os.path.join(script_dir, 'uploads', annotated_filename)
-        annotated_image.save(annotated_path)
-        
-        # Prepare response
-        response = {
-            "annotated_filename": annotated_filename,
-            "metrics": {
-                "Number of Detections": num_detections,
-                "Average Confidence": f"{avg_confidence:.2f}"
-            },
-            "descriptions": {}
-        }
-        
-        # Add descriptions if requested
-        if show_descriptions and detected_classes:
-            response["descriptions"] = {
-                cls.capitalize(): CLASS_DESCRIPTIONS.get(cls, "No description available.")
-                for cls in detected_classes
+        # Check if file is video or image
+        if is_video_file(file_path):
+            # Process video
+            if model_type == "yolov8":
+                frame_count, total_detections, detected_classes = detect_video_yolov8(file_path, threshold)
+            else:
+                # Roboflow doesn't support video in this implementation
+                print(json.dumps({"error": "Roboflow model does not support video detection. Please use YOLOv8 for videos."}))
+                sys.exit(1)
+            
+            # Prepare response for video
+            response = {
+                "annotated_filename": None,
+                "metrics": {
+                    "Frames Processed": frame_count,
+                    "Total Detections": total_detections,
+                    "Unique Classes": ', '.join([cls.capitalize() for cls in detected_classes])
+                },
+                "descriptions": {},
+                "is_video": True
             }
+            
+            # Add descriptions if requested
+            if show_descriptions and detected_classes:
+                response["descriptions"] = {
+                    cls.capitalize(): CLASS_DESCRIPTIONS.get(cls, "No description available.")
+                    for cls in detected_classes
+                }
+        else:
+            # Process image
+            # Perform detection based on model type
+            if model_type == "roboflow":
+                annotated_image, num_detections, avg_confidence, detected_classes = detect_with_roboflow(file_path, threshold)
+            else:  # yolov8
+                annotated_image, num_detections, avg_confidence, detected_classes = detect_with_yolov8(file_path, threshold)
+            
+            # Save annotated image
+            base_name = os.path.basename(file_path)
+            name_without_ext = os.path.splitext(base_name)[0]
+            annotated_filename = f"annotated_{name_without_ext}.png"
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            annotated_path = os.path.join(script_dir, 'uploads', annotated_filename)
+            annotated_image.save(annotated_path)
+            
+            # Prepare response
+            response = {
+                "annotated_filename": annotated_filename,
+                "metrics": {
+                    "Number of Detections": num_detections,
+                    "Average Confidence": f"{avg_confidence:.2f}"
+                },
+                "descriptions": {},
+                "is_video": False
+            }
+            
+            # Add descriptions if requested
+            if show_descriptions and detected_classes:
+                response["descriptions"] = {
+                    cls.capitalize(): CLASS_DESCRIPTIONS.get(cls, "No description available.")
+                    for cls in detected_classes
+                }
         
         # Output JSON result
         print(json.dumps(response))

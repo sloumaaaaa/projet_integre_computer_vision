@@ -219,9 +219,15 @@
             // Show results container
             document.getElementById('results').style.display = 'block';
 
-            // Display annotated image
-            const imageUrl = `http://localhost:8081${result.annotatedImageUrl}`;
-            document.getElementById('resultImage').src = imageUrl;
+            // Display annotated image (only for images, not videos)
+            const imageCard = document.querySelector('.card:has(#resultImage)');
+            if (result.is_video || !result.annotatedImageUrl) {
+                imageCard.style.display = 'none';
+            } else {
+                imageCard.style.display = 'block';
+                const imageUrl = `http://localhost:8081${result.annotatedImageUrl}`;
+                document.getElementById('resultImage').src = imageUrl;
+            }
 
             // Display metrics
             const metricsList = document.getElementById('metricsList');
