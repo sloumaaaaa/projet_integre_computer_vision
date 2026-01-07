@@ -66,7 +66,8 @@ def detect_with_roboflow(image_path, threshold):
     model = get_model(model_id="animal-detection-ioduj/2")
     image = Image.open(image_path).convert("RGB")
     
-    results = model.infer(image)[0]
+    raw_results = model.infer(image)
+    results = raw_results[0] if isinstance(raw_results, list) else raw_results
     detections = sv.Detections.from_inference(results)
     
     # Apply threshold filter
@@ -84,9 +85,13 @@ def detect_with_roboflow(image_path, threshold):
     
     detected_classes = set()
     if num_detections > 0:
-        for label in detections.class_id:
-            class_name = model.classes[label] if hasattr(model, 'classes') else str(label)
-            detected_classes.add(class_name.strip().lower())
+        # Extract class names from the predictions attribute (not .get())
+        if hasattr(results, 'predictions'):
+            predictions = results.predictions
+            for prediction in predictions:
+                if prediction.confidence >= threshold:
+                    class_name = prediction.class_name if hasattr(prediction, 'class_name') else str(getattr(prediction, 'class', 'unknown'))
+                    detected_classes.add(class_name.strip().lower())
     
     return annotated_image, num_detections, avg_confidence, detected_classes
 
