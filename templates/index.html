@@ -19,7 +19,11 @@
         <form method="POST" action="/upload" enctype="multipart/form-data" class="mb-4">
             <div class="mb-3">
                 <label for="image" class="form-label">Select an image:</label>
-                <input type="file" class="form-control" name="image" id="image" accept="image/*" required>
+                <input type="file" class="form-control" name="image" id="image" accept="image/*">
+            </div>
+            <div class="mb-3">
+                <label for="video" class="form-label">Or select a video:</label>
+                <input type="file" class="form-control" name="video" id="video" accept="video/*">
             </div>
             <div class="mb-3">
                 <label for="model" class="form-label">Select Model:</label>
@@ -41,9 +45,20 @@
             <button type="submit" class="btn btn-primary w-100">Upload and Detect</button>
         </form>
 
+
         {% if result_url %}
             <h2 class="mt-4">Result</h2>
             <img src="{{ result_url }}" alt="Annotated Result" class="result-img">
+        {% endif %}
+
+        {% if video_stream %}
+            <h2 class="mt-4">Video Detection Stream</h2>
+            <img src="{{ url_for('video_feed', video_path=video_path, threshold=threshold) }}" class="result-img" alt="Video Stream">
+            <form method="get" action="{{ url_for('video_results') }}" class="mt-3">
+                <input type="hidden" name="video_path" value="{{ video_path }}">
+                <input type="hidden" name="threshold" value="{{ threshold }}">
+                <button type="submit" class="btn btn-success w-100">Show Video Metrics</button>
+            </form>
         {% endif %}
 
         {% if metrics %}
