@@ -1,7 +1,25 @@
 <div class="container-custom">
-  <h1 class="mb-4 text-center">🐾 Animal Detection Web App</h1>
-  
-  <div class="card">
+  <!-- View Selector -->
+  <div class="view-selector">
+    <button 
+      class="view-btn" 
+      [class.active]="currentView === 'classic'"
+      (click)="currentView = 'classic'">
+      📊 Classic Mode
+    </button>
+    <button 
+      class="view-btn" 
+      [class.active]="currentView === 'ar'"
+      (click)="currentView = 'ar'">
+      🎮 AR Experience
+    </button>
+  </div>
+
+  <!-- Classic View -->
+  <div *ngIf="currentView === 'classic'">
+    <h1 class="mb-4 text-center">🐾 Animal Detection Web App</h1>
+    
+    <div class="card">
     <div class="card-body">
       <form (ngSubmit)="onSubmit()">
         <!-- File Selection -->
@@ -130,4 +148,8 @@
       </div>
     </div>
   </div>
+  </div>
+
+  <!-- AR Experience View -->
+  <app-ar-experience *ngIf="currentView === 'ar'"></app-ar-experience>
 </div>

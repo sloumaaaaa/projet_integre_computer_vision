@@ -3,16 +3,20 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DetectionService } from './services/detection.service';
 import { DetectionResponse } from './models/detection.model';
+import { ArExperienceComponent } from './ar-experience/ar-experience.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ArExperienceComponent],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
   title = 'Animal Detection App';
+  
+  // View mode
+  currentView: 'classic' | 'ar' = 'classic';
   
   selectedFile: File | null = null;
   modelType: string = 'yolov8';

@@ -8,6 +8,8 @@ export interface DetectionResponse {
   annotatedImageUrl: string;
   metrics: { [key: string]: any };
   descriptions?: { [key: string]: string };
+  classDescriptions?: { [key: string]: string };
+  detectedClasses?: string[];
   status: string;
   message: string;
 }

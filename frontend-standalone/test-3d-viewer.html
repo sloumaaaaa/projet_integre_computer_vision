@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Model Viewer Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 900px;
+        }
+        .test-card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1, h2 {
+            color: white;
+            text-align: center;
+        }
+        model-viewer {
+            width: 100%;
+            height: 500px;
+            border-radius: 15px;
+            background: linear-gradient(135deg, #e0f7fa 0%, #e1bee7 100%);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.warning { background: #fff3cd; color: #856404; }
+        .status.info { background: #d1ecf1; color: #0c5460; }
+        .btn-test {
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4">🎨 3D Model Viewer - Test Page</h1>
+        
+        <div class="test-card">
+            <h2 style="color: #667eea;">Status Check ✅</h2>
+            
+            <div class="status success">
+                ✓ Model Viewer Library Loaded
+            </div>
+            <div class="status success">
+                ✓ Using free CDN models (placeholder animals)
+            </div>
+            <div class="status info">
+                ℹ Ready for local models in /assets/ folder
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2 style="color: #667eea;">Interactive 3D Model Test</h2>
+            <p class="text-center mb-4">
+                <strong>Try these controls:</strong><br>
+                🖱️ Drag to rotate | 📌 Two-finger drag to pan | 🔍 Scroll to zoom
+            </p>
+
+            <div id="modelContainer">
+                <model-viewer
+                    id="testModel"
+                    src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+                    alt="Test 3D Model"
+                    ar
+                    ar-modes="webxr scene-viewer quick-look"
+                    camera-controls
+                    touch-action="pan-y"
+                    auto-rotate
+                    auto-rotate-delay="1000"
+                    rotation-per-second="30deg"
+                    shadow-intensity="1"
+                    camera-orbit="45deg 75deg 2.5m"
+                    min-camera-orbit="auto auto 1m"
+                    max-camera-orbit="auto auto 10m">
+                    
+                    <button slot="ar-button" class="btn btn-primary" style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);">
+                        📱 View in AR
+                    </button>
+                    
+                    <div class="progress" slot="progress-bar" style="height: 25px; margin: 20px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;"></div>
+                    </div>
+                </model-viewer>
+            </div>
+
+            <div class="mt-4 text-center">
+                <p><strong>Model Status:</strong> <span id="modelStatus" class="badge bg-secondary">Loading...</span></p>
+                <p><small>Currently showing: <strong id="currentModel">Astronaut (placeholder)</strong></small></p>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2 style="color: #667eea;">Test Different Models</h2>
+            <p class="text-center">Click to load different placeholder models:</p>
+            
+            <div class="text-center">
+                <button class="btn btn-outline-primary btn-test" onclick="loadModel('astronaut', 'https://modelviewer.dev/shared-assets/models/Astronaut.glb')">
+                    🚀 Astronaut
+                </button>
+                <button class="btn btn-outline-primary btn-test" onclick="loadModel('robot', 'https://modelviewer.dev/shared-assets/models/RobotExpressive.glb')">
+                    🤖 Robot
+                </button>
+                <button class="btn btn-outline-primary btn-test" onclick="loadModel('horse', 'https://modelviewer.dev/shared-assets/models/Horse.glb')">
+                    🐴 Horse
+                </button>
+                <button class="btn btn-outline-primary btn-test" onclick="loadModel('fox', 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Fox/glTF-Binary/Fox.glb')">
+                    🦊 Fox
+                </button>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2 style="color: #667eea;">Features Available</h2>
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>✅ Working Now:</h5>
+                    <ul>
+                        <li>360° rotation</li>
+                        <li>Zoom in/out</li>
+                        <li>Pan camera</li>
+                        <li>Auto-rotate animation</li>
+                        <li>Shadow rendering</li>
+                        <li>Loading progress</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5>📱 Mobile Features:</h5>
+                    <ul>
+                        <li>Touch controls</li>
+                        <li>Pinch to zoom</li>
+                        <li>AR viewing (with models)</li>
+                        <li>Scene Viewer (Android)</li>
+                        <li>Quick Look (iOS)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-card">
+            <h2 style="color: #667eea;">Next Steps</h2>
+            <ol>
+                <li><strong>Download Real Animal Models</strong>
+                    <ul>
+                        <li>Run <code>download-models.bat</code> in frontend-standalone folder</li>
+                        <li>Or see <code>assets/MODELS_GUIDE.md</code> for manual instructions</li>
+                    </ul>
+                </li>
+                <li><strong>Test in Main App</strong>
+                    <ul>
+                        <li>Open <code>index-ar.html</code></li>
+                        <li>Switch to "AR Experience" mode</li>
+                        <li>Upload an animal image</li>
+                        <li>Click on collected animal to view 3D</li>
+                    </ul>
+                </li>
+                <li><strong>Test AR on Mobile</strong>
+                    <ul>
+                        <li>Access from phone (need HTTPS or localhost)</li>
+                        <li>Tap "View in AR" button</li>
+                        <li>Place animal in your space!</li>
+                    </ul>
+                </li>
+            </ol>
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="index-ar.html" class="btn btn-light btn-lg">← Back to AR Experience</a>
+            <a href="FEATURES.html" class="btn btn-outline-light btn-lg">📋 All Features</a>
+        </div>
+    </div>
+
+    <script>
+        const modelViewer = document.getElementById('testModel');
+        const statusBadge = document.getElementById('modelStatus');
+        const currentModelSpan = document.getElementById('currentModel');
+
+        // Listen for model load events
+        modelViewer.addEventListener('load', () => {
+            statusBadge.textContent = '✅ Loaded';
+            statusBadge.className = 'badge bg-success';
+        });
+
+        modelViewer.addEventListener('error', (e) => {
+            statusBadge.textContent = '❌ Error';
+            statusBadge.className = 'badge bg-danger';
+            console.error('Model loading error:', e);
+        });
+
+        modelViewer.addEventListener('progress', (e) => {
+            const progress = e.detail.totalProgress * 100;
+            if (progress < 100) {
+                statusBadge.textContent = `Loading ${Math.round(progress)}%`;
+                statusBadge.className = 'badge bg-warning';
+            }
+        });
+
+        function loadModel(name, url) {
+            statusBadge.textContent = 'Loading...';
+            statusBadge.className = 'badge bg-secondary';
+            currentModelSpan.textContent = name.charAt(0).toUpperCase() + name.slice(1) + ' (placeholder)';
+            modelViewer.src = url;
+        }
+
+        // AR button status
+        if (modelViewer.canActivateAR) {
+            console.log('✅ AR is available on this device!');
+        } else {
+            console.log('ℹ AR not available (desktop or unsupported device)');
+        }
+    </script>
+</body>
+</html>

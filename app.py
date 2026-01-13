@@ -21,12 +21,16 @@ CLASS_DESCRIPTIONS = {
         "From the founding myth of Rome to Native American legends, wolves are known for their pack behavior, intelligence, and adaptability."
     )
 }
-from flask import Flask, render_template, request, redirect, url_for, send_file
+from flask import Flask, render_template, request, redirect, url_for, send_file, jsonify
+from flask_cors import CORS
 import os
 from dotenv import load_dotenv
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'your_default_secret_key_here')
+
+# Enable CORS for all routes
+CORS(app)
 
 # Load environment variables
 load_dotenv()
@@ -224,6 +228,141 @@ def video_feed():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_file(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+# AR Experience API endpoints
+@app.route('/api/animals', methods=['GET'])
+def get_animals():
+    """Get all available animals with their metadata"""
+    animals = [
+        {
+            'id': 'elephant',
+            'name': 'elephant',
+            'displayName': 'Elephant',
+            'description': CLASS_DESCRIPTIONS.get('elephant', ''),
+            'rarity': 'uncommon',
+            'points': 150
+        },
+        {
+            'id': 'lion',
+            'name': 'lion',
+            'displayName': 'Lion',
+            'description': CLASS_DESCRIPTIONS.get('lion', ''),
+            'rarity': 'rare',
+            'points': 200
+        },
+        {
+            'id': 'tiger',
+            'name': 'tiger',
+            'displayName': 'Tiger',
+            'description': CLASS_DESCRIPTIONS.get('tiger', ''),
+            'rarity': 'rare',
+            'points': 250
+        },
+        {
+            'id': 'wolf',
+            'name': 'wolf',
+            'displayName': 'Wolf',
+            'description': CLASS_DESCRIPTIONS.get('wolf', ''),
+            'rarity': 'uncommon',
+            'points': 175
+        },
+        {
+            'id': 'pig',
+            'name': 'pig',
+            'displayName': 'Pig',
+            'description': CLASS_DESCRIPTIONS.get('pig', ''),
+            'rarity': 'common',
+            'points': 100
+        }
+    ]
+    return {'status': 'success', 'animals': animals}
+
+@app.route('/api/detect-with-classes', methods=['POST'])
+def detect_with_classes():
+    """Enhanced detection endpoint that returns detected class names"""
+    from flask import jsonify
+    
+    image_file = request.files.get('image')
+    if not image_file or image_file.filename == '':
+        return jsonify({'status': 'error', 'message': 'No image provided'}), 400
+
+    try:
+        threshold = float(request.form.get('threshold', 0.5))
+    except Exception:
+        threshold = 0.5
+    
+    model_choice = request.form.get('model', 'yolov8')
+    detected_classes = []
+
+    filename = secure_filename(image_file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    image_file.save(filepath)
+
+    if model_choice == 'yolov8':
+        from ultralytics import YOLO
+        import numpy as np
+        image = Image.open(filepath).convert("RGB")
+        model_path = os.path.join('output_yolo_labeled', 'yolov8_exp', 'weights', 'best.pt')
+        model = YOLO(model_path)
+        results = model.predict(image, conf=threshold, save=False, verbose=False)[0]
+        
+        annotated_image = np.array(image).copy()
+        for box, score, cls in zip(results.boxes.xyxy.cpu().numpy(), results.boxes.conf.cpu().numpy(), results.boxes.cls.cpu().numpy()):
+            if score >= threshold:
+                x1, y1, x2, y2 = map(int, box)
+                label = model.names[int(cls)]
+                detected_classes.append(label.lower())
+                import cv2
+                cv2.rectangle(annotated_image, (x1, y1), (x2, y2), (0,255,0), 2)
+                cv2.putText(annotated_image, f'{label} {score:.2f}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2)
+        
+        annotated_image = Image.fromarray(annotated_image)
+        annotated_path = os.path.join(app.config['UPLOAD_FOLDER'], f"annotated_{filename}.png")
+        annotated_image.save(annotated_path)
+        
+        num_detections = len(results.boxes)
+        avg_confidence = float(np.mean(results.boxes.conf.cpu().numpy())) if num_detections > 0 else 0.0
+    else:
+        # Roboflow model
+        from inference import get_model
+        import supervision as sv
+        model = get_model(model_id="animal-detection-ioduj/2")
+        image = Image.open(filepath).convert("RGB")
+        results = model.infer(image)[0]
+        detections = sv.Detections.from_inference(results)
+        mask = detections.confidence >= threshold
+        detections = detections[mask]
+        
+        box_annotator = sv.BoxAnnotator()
+        label_annotator = sv.LabelAnnotator()
+        annotated_image = box_annotator.annotate(scene=image, detections=detections)
+        annotated_image = label_annotator.annotate(scene=annotated_image, detections=detections)
+        annotated_path = os.path.join(app.config['UPLOAD_FOLDER'], f"annotated_{filename}.png")
+        annotated_image.save(annotated_path)
+        
+        num_detections = len(detections)
+        avg_confidence = float(detections.confidence.mean()) if num_detections > 0 else 0.0
+        
+        if num_detections > 0:
+            for label in detections.class_id:
+                class_name = model.classes[label] if hasattr(model, 'classes') else str(label)
+                detected_classes.append(class_name.strip().lower())
+
+    metrics = {
+        'Number of Detections': num_detections,
+        'Average Confidence': f"{avg_confidence:.2f}"
+    }
+
+    class_descriptions = {cls.capitalize(): CLASS_DESCRIPTIONS.get(cls, "No description available.") for cls in set(detected_classes)}
+
+    return jsonify({
+        'status': 'success',
+        'annotatedImageUrl': f'/uploads/{os.path.basename(annotated_path)}',
+        'metrics': metrics,
+        'detectedClasses': list(set(detected_classes)),
+        'classDescriptions': class_descriptions,
+        'message': 'Detection completed successfully'
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

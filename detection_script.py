@@ -137,6 +137,44 @@ def detect_video_yolov8(video_path, threshold):
     
     return frame_count, total_detections, detected_classes
 
+def detect_video_roboflow(video_path, threshold):
+    """Perform detection on video using Roboflow model"""
+    from inference import get_model
+    import cv2
+    
+    model = get_model(model_id="animal-detection-ioduj/2")
+    cap = cv2.VideoCapture(video_path)
+    frame_count = 0
+    detected_classes = set()
+    total_detections = 0
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        
+        # Convert BGR to RGB for Roboflow
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Inference on frame
+        results = model.infer(frame_rgb)
+        results = results[0] if isinstance(results, list) else results
+        
+        # Extract predictions
+        if hasattr(results, 'predictions'):
+            predictions = results.predictions
+            for prediction in predictions:
+                if prediction.confidence >= threshold:
+                    class_name = prediction.class_name if hasattr(prediction, 'class_name') else str(getattr(prediction, 'class', 'unknown'))
+                    detected_classes.add(class_name.strip().lower())
+                    total_detections += 1
+        
+        frame_count += 1
+    
+    cap.release()
+    
+    return frame_count, total_detections, detected_classes
+
 def main():
     if len(sys.argv) < 5:
         print(json.dumps({"error": "Invalid arguments"}))
@@ -153,10 +191,8 @@ def main():
             # Process video
             if model_type == "yolov8":
                 frame_count, total_detections, detected_classes = detect_video_yolov8(file_path, threshold)
-            else:
-                # Roboflow doesn't support video in this implementation
-                print(json.dumps({"error": "Roboflow model does not support video detection. Please use YOLOv8 for videos."}))
-                sys.exit(1)
+            else:  # roboflow
+                frame_count, total_detections, detected_classes = detect_video_roboflow(file_path, threshold)
             
             # Prepare response for video
             response = {
