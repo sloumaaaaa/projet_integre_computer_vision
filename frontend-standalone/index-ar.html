@@ -241,10 +241,89 @@
         }
 
         .hidden { display: none !important; }
+        
+        /* Session UI */
+        .session-bar {
+            background: white;
+            padding: 15px 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+        }
+        
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
     </style>
 </head>
 <body>
     <div class="container-custom">
+        <!-- Session Bar -->
+        <div class="session-bar">
+            <div class="user-info">
+                <div id="userSection">
+                    <span id="guestMode">
+                        <button class="btn btn-primary" onclick="showLoginModal()">Login</button>
+                        <button class="btn btn-outline-primary" onclick="showRegisterModal()">Register</button>
+                    </span>
+                    <span id="loggedInMode" class="hidden">
+                        <div class="user-avatar" id="userAvatar">U</div>
+                        <div>
+                            <strong id="usernameDisplay">User</strong>
+                            <small class="d-block text-muted">Logged in</small>
+                        </div>
+                    </span>
+                </div>
+            </div>
+            <div>
+                <button id="logoutBtn" class="btn btn-outline-danger btn-sm hidden" onclick="logout()">Logout</button>
+            </div>
+        </div>
+        
         <!-- View Selector -->
         <div class="view-selector">
             <button class="view-btn active" onclick="switchView('classic')">
@@ -439,6 +518,17 @@
                 <p>Best Streak: <strong id="statBestStreak">0</strong></p>
                 <button class="btn btn-danger mt-3" onclick="resetGame()">🔄 Reset Progress</button>
             </div>
+            
+            <!-- Leaderboard -->
+            <div class="upload-section">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>🏆 Leaderboard</h3>
+                    <button class="btn btn-primary btn-sm" onclick="loadLeaderboard()">🔄 Refresh</button>
+                </div>
+                <div id="leaderboardContent">
+                    <p class="text-center text-muted">Login to see the leaderboard!</p>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -619,6 +709,10 @@
 
         function saveGameState() {
             localStorage.setItem('animal_ar_game', JSON.stringify(gameState));
+            // Also save to server if logged in
+            if (currentSession) {
+                saveGameProgressToServer();
+            }
         }
 
         function pickRandomTarget() {
@@ -871,11 +965,343 @@
 
         function resetGame() {
             if (confirm('Reset all progress?')) {
-                localStorage.removeItem('animal_ar_game');
+                if (currentSession) {
+                    // Reset on server
+                    saveGameProgressToServer();
+                } else {
+                    localStorage.removeItem('animal_ar_game');
+                }
                 gameState = loadGameState();
                 initializeGame();
             }
         }
+        
+        // ============================================
+        // SESSION MANAGEMENT
+        // ============================================
+        
+        const SESSION_API = 'http://localhost:8081/api/session';
+        let currentSession = null;
+        
+        // Load session on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSession();
+        });
+        
+        function loadSession() {
+            const sessionId = localStorage.getItem('sessionId');
+            if (sessionId) {
+                validateSession(sessionId);
+            }
+        }
+        
+        async function validateSession(sessionId) {
+            try {
+                const response = await fetch(`${SESSION_API}/validate`, {
+                    headers: { 'Session-Id': sessionId }
+                });
+                const data = await response.json();
+                
+                if (data.valid) {
+                    currentSession = {
+                        sessionId: sessionId,
+                        username: data.username,
+                        userId: data.userId
+                    };
+                    updateSessionUI();
+                    loadGameProgressFromServer();
+                } else {
+                    localStorage.removeItem('sessionId');
+                }
+            } catch (error) {
+                console.log('Session validation failed:', error);
+            }
+        }
+        
+        function updateSessionUI() {
+            if (currentSession) {
+                document.getElementById('guestMode').classList.add('hidden');
+                document.getElementById('loggedInMode').classList.remove('hidden');
+                document.getElementById('logoutBtn').classList.remove('hidden');
+                document.getElementById('usernameDisplay').textContent = currentSession.username;
+                document.getElementById('userAvatar').textContent = currentSession.username.charAt(0).toUpperCase();
+            } else {
+                document.getElementById('guestMode').classList.remove('hidden');
+                document.getElementById('loggedInMode').classList.add('hidden');
+                document.getElementById('logoutBtn').classList.add('hidden');
+            }
+        }
+        
+        function showLoginModal() {
+            document.getElementById('loginModal').classList.add('show');
+        }
+        
+        function showRegisterModal() {
+            document.getElementById('registerModal').classList.add('show');
+        }
+        
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.remove('show');
+        }
+        
+        function closeRegisterModal() {
+            document.getElementById('registerModal').classList.remove('show');
+        }
+        
+        async function handleLogin(event) {
+            event.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            try {
+                const response = await fetch(`${SESSION_API}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSession = {
+                        sessionId: data.sessionId,
+                        username: data.username,
+                        userId: data.userId
+                    };
+                    localStorage.setItem('sessionId', data.sessionId);
+                    updateSessionUI();
+                    closeLoginModal();
+                    loadGameProgressFromServer();
+                    alert('Welcome back, ' + data.username + '!');
+                } else {
+                    errorDiv.textContent = data.error || 'Login failed';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Please try again.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+        
+        async function handleRegister(event) {
+            event.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const errorDiv = document.getElementById('registerError');
+            
+            try {
+                const response = await fetch(`${SESSION_API}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentSession = {
+                        sessionId: data.sessionId,
+                        username: data.username,
+                        userId: data.userId
+                    };
+                    localStorage.setItem('sessionId', data.sessionId);
+                    updateSessionUI();
+                    closeRegisterModal();
+                    alert('Welcome, ' + data.username + '! Your adventure begins!');
+                } else {
+                    errorDiv.textContent = data.error || 'Registration failed';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Please try again.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+        
+        async function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    await fetch(`${SESSION_API}/logout`, {
+                        method: 'POST',
+                        headers: { 'Session-Id': currentSession.sessionId }
+                    });
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+                
+                localStorage.removeItem('sessionId');
+                currentSession = null;
+                updateSessionUI();
+                
+                // Reset to guest mode
+                gameState = {
+                    collected: [],
+                    points: 0,
+                    level: 1,
+                    streak: 0,
+                    bestStreak: 0,
+                    detections: 0,
+                    badges: []
+                };
+                updateHUD();
+                renderCollection();
+                renderBadges();
+            }
+        }
+        
+        async function loadGameProgressFromServer() {
+            if (!currentSession) return;
+            
+            try {
+                const response = await fetch(`${SESSION_API}/progress`, {
+                    headers: { 'Session-Id': currentSession.sessionId }
+                });
+                const progress = await response.json();
+                
+                gameState = {
+                    collected: progress.collectedAnimals || [],
+                    points: progress.points || 0,
+                    level: progress.level || 1,
+                    streak: progress.streak || 0,
+                    bestStreak: progress.bestStreak || 0,
+                    detections: progress.totalDetections || 0,
+                    badges: progress.badges || []
+                };
+                
+                updateHUD();
+                renderCollection();
+                renderBadges();
+            } catch (error) {
+                console.error('Failed to load progress:', error);
+            }
+        }
+        
+        async function saveGameProgressToServer() {
+            if (!currentSession) return;
+            
+            try {
+                const progress = {
+                    points: gameState.points,
+                    level: gameState.level,
+                    streak: gameState.streak,
+                    bestStreak: gameState.bestStreak,
+                    totalDetections: gameState.detections,
+                    collectedAnimals: gameState.collected,
+                    badges: gameState.badges
+                };
+                
+                await fetch(`${SESSION_API}/progress`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Session-Id': currentSession.sessionId
+                    },
+                    body: JSON.stringify(progress)
+                });
+            } catch (error) {
+                console.error('Failed to save progress:', error);
+            }
+        }
+        
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch(`${SESSION_API}/leaderboard`);
+                const data = await response.json();
+                const leaderboard = data.leaderboard;
+                
+                const content = document.getElementById('leaderboardContent');
+                
+                if (leaderboard.length === 0) {
+                    content.innerHTML = '<p class="text-center text-muted">No players yet. Be the first!</p>';
+                    return;
+                }
+                
+                let html = '<table class="table table-striped"><thead><tr><th>#</th><th>Player</th><th>Points</th><th>Level</th><th>Collection</th></tr></thead><tbody>';
+                
+                leaderboard.forEach((player, index) => {
+                    const rank = index + 1;
+                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+                    html += `<tr>
+                        <td>${medal}</td>
+                        <td><strong>${player.username}</strong></td>
+                        <td>${player.points}</td>
+                        <td>${player.level}</td>
+                        <td>${player.collected}/5</td>
+                    </tr>`;
+                });
+                
+                html += '</tbody></table>';
+                content.innerHTML = html;
+            } catch (error) {
+                console.error('Failed to load leaderboard:', error);
+                document.getElementById('leaderboardContent').innerHTML = 
+                    '<p class="text-center text-danger">Failed to load leaderboard</p>';
+            }
+        }
+        
+        // Auto-load leaderboard if in AR view
+        setInterval(() => {
+            if (currentView === 'ar' && currentSession) {
+                loadLeaderboard();
+            }
+        }, 30000); // Refresh every 30 seconds
     </script>
+    
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-center mb-4">🔐 Login</h2>
+            <form onsubmit="handleLogin(event)">
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" id="loginUsername" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="loginPassword" required>
+                </div>
+                <div id="loginError" class="alert alert-danger hidden"></div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">Login</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeLoginModal()">Cancel</button>
+                </div>
+            </form>
+            <p class="text-center mt-3">
+                <small>Don't have an account? <a href="#" onclick="closeLoginModal(); showRegisterModal();">Register</a></small>
+            </p>
+        </div>
+    </div>
+    
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-center mb-4">📝 Register</h2>
+            <form onsubmit="handleRegister(event)">
+                <div class="mb-3">
+                    <label class="form-label">Username</label>
+                    <input type="text" class="form-control" id="registerUsername" required minlength="3">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-control" id="registerEmail" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" class="form-control" id="registerPassword" required minlength="6">
+                    <small class="text-muted">At least 6 characters</small>
+                </div>
+                <div id="registerError" class="alert alert-danger hidden"></div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">Register</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeRegisterModal()">Cancel</button>
+                </div>
+            </form>
+            <p class="text-center mt-3">
+                <small>Already have an account? <a href="#" onclick="closeRegisterModal(); showLoginModal();">Login</a></small>
+            </p>
+        </div>
+    </div>
 </body>
 </html>
