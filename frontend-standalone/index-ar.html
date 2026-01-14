@@ -892,26 +892,15 @@
         }
         
         function get3DModelUrl(animalName) {
-            // Use smaller CDN models for faster loading
-            const models = {
-                'elephant': 'https://modelviewer.dev/shared-assets/models/Horse.glb',
-                'tiger': 'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
-                'lion': 'https://modelviewer.dev/shared-assets/models/NeilArmstrong.glb',
-                'wolf': 'https://modelviewer.dev/shared-assets/models/Horse.glb',
-                'pig': 'https://modelviewer.dev/shared-assets/models/Astronaut.glb'
-            };
-            
-            // Uncomment below to use local models when server is running:
-            /*
+            // Use local models from assets folder
             const timestamp = new Date().getTime();
             const models = {
-                'elephant': `./assets/elephant.glb?v=${timestamp}`,
-                'tiger': `./assets/tiger.glb?v=${timestamp}`,
-                'lion': `./assets/lion.glb?v=${timestamp}`,
-                'wolf': `./assets/wolf.glb?v=${timestamp}`,
-                'pig': `./assets/pig.glb?v=${timestamp}`
+                'elephant': `assets/elephant.glb?v=${timestamp}`,
+                'tiger': `assets/tiger.glb?v=${timestamp}`,
+                'lion': `assets/lion.glb?v=${timestamp}`,
+                'wolf': `assets/wolf.glb?v=${timestamp}`,
+                'pig': `assets/pig.glb?v=${timestamp}`
             };
-            */
             
             return models[animalName.toLowerCase()] || null;
         }

@@ -1,0 +1,1 @@
+cd frontend-standalone ; python -m http.server 8000
