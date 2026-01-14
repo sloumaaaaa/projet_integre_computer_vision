@@ -320,6 +320,9 @@
                 </div>
             </div>
             <div>
+                <button id="refreshProgressBtn" class="btn btn-outline-info btn-sm hidden" onclick="loadGameProgressFromServer(true)" title="Refresh progress from database">
+                    🔄 Refresh
+                </button>
                 <button id="logoutBtn" class="btn btn-outline-danger btn-sm hidden" onclick="logout()">Logout</button>
             </div>
         </div>
@@ -1020,12 +1023,14 @@
                 document.getElementById('guestMode').classList.add('hidden');
                 document.getElementById('loggedInMode').classList.remove('hidden');
                 document.getElementById('logoutBtn').classList.remove('hidden');
+                document.getElementById('refreshProgressBtn').classList.remove('hidden');
                 document.getElementById('usernameDisplay').textContent = currentSession.username;
                 document.getElementById('userAvatar').textContent = currentSession.username.charAt(0).toUpperCase();
             } else {
                 document.getElementById('guestMode').classList.remove('hidden');
                 document.getElementById('loggedInMode').classList.add('hidden');
                 document.getElementById('logoutBtn').classList.add('hidden');
+                document.getElementById('refreshProgressBtn').classList.add('hidden');
             }
         }
         
@@ -1148,14 +1153,18 @@
             }
         }
         
-        async function loadGameProgressFromServer() {
+        async function loadGameProgressFromServer(forceRefresh = false) {
             if (!currentSession) return;
             
             try {
-                const response = await fetch(`${SESSION_API}/progress`, {
+                const endpoint = forceRefresh ? `${SESSION_API}/progress/refresh` : `${SESSION_API}/progress`;
+                const response = await fetch(endpoint, {
                     headers: { 'Session-Id': currentSession.sessionId }
                 });
-                const progress = await response.json();
+                const data = await response.json();
+                
+                // Handle both direct progress and wrapped response
+                const progress = data.progress || data;
                 
                 gameState = {
                     collected: progress.collectedAnimals || [],
@@ -1166,6 +1175,11 @@
                     detections: progress.totalDetections || 0,
                     badges: progress.badges || []
                 };
+                
+                if (forceRefresh) {
+                    console.log('✅ Progress refreshed from database:', data.message);
+                    showNotification('✅ Progress loaded from database!', 'success');
+                }
                 
                 updateHUD();
                 renderCollection();

@@ -131,6 +131,15 @@ public class SessionService {
     }
     
     /**
+     * Refresh and get latest game progress directly from database
+     */
+    public UserGameProgress refreshProgressFromDatabase(String sessionId) {
+        UserSession session = validateSession(sessionId);
+        return gameProgressRepository.findById(session.getUserId())
+            .orElseThrow(() -> new RuntimeException("Game progress not found. Please start playing to create progress."));
+    }
+    
+    /**
      * Get leaderboard (top 10 players by points)
      */
     public List<Map<String, Object>> getLeaderboard() {

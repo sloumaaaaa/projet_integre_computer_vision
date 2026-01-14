@@ -165,6 +165,28 @@ public class SessionController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    
+    /**
+     * Refresh game progress directly from database (force reload)
+     */
+    @GetMapping("/progress/refresh")
+    public ResponseEntity<?> refreshProgress(@RequestHeader("Session-Id") String sessionId) {
+        try {
+            UserGameProgress progress = sessionService.refreshProgressFromDatabase(sessionId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Progress refreshed from database");
+            response.put("progress", progress);
+            response.put("source", "database");
+            
+            log.info("Progress refreshed from database for session: {}", sessionId);
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 
     /**
      * Update game progress
