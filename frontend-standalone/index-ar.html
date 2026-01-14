@@ -477,8 +477,8 @@
                     auto-rotate
                     shadow-intensity="1"
                     loading="eager"
-                    reveal="interaction"
-                    interaction-prompt="none">
+                    reveal="auto"
+                    style="display: none;">
                     <button slot="ar-button" class="btn btn-primary" style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);">
                         📱 View in AR
                     </button>
@@ -826,53 +826,61 @@
             const modelUrl = get3DModelUrl(animalName);
             
             if (modelUrl) {
+                console.log('Loading model:', modelUrl);
+                
                 // Show loading indicator with message
                 loadingIndicator.style.display = 'block';
-                loadingIndicator.innerHTML = '<div class="spinner-border text-primary" role="status"></div><p class="mt-3">Loading 3D Model... Please wait</p><small>Large models may take 10-30 seconds</small>';
+                loadingIndicator.innerHTML = '<div class="spinner-border text-primary" role="status"></div><p class="mt-3">Loading 3D Model... Please wait</p>';
                 modelViewer.style.display = 'none';
                 notAvailable.style.display = 'none';
                 
-                // Clear previous model first
-                if (modelViewer.src) {
-                    modelViewer.src = '';
-                }
-                
-                // Add progress tracking
-                const progressBar = modelViewer.querySelector('.progress-bar-fill');
-                modelViewer.addEventListener('progress', function onProgress(e) {
+                // Progress tracking handler
+                const handleProgress = (e) => {
                     const progress = e.detail.totalProgress * 100;
-                    if (progressBar) {
-                        progressBar.style.width = progress + '%';
-                    }
+                    console.log('Model loading progress:', progress + '%');
                     loadingIndicator.innerHTML = `<div class="spinner-border text-primary" role="status"></div><p class="mt-3">Loading 3D Model... ${Math.round(progress)}%</p>`;
-                }, { once: false });
+                };
                 
-                // Set model source with small delay to ensure cleanup
-                setTimeout(() => {
-                    modelViewer.src = modelUrl;
-                }, 100);
-                
-                // Listen for model load
-                modelViewer.addEventListener('load', function onLoad() {
+                // Load handler
+                const handleLoad = () => {
+                    console.log('Model loaded successfully!');
                     loadingIndicator.style.display = 'none';
                     modelViewer.style.display = 'block';
-                    modelViewer.removeEventListener('load', onLoad);
-                    modelViewer.removeEventListener('progress', onProgress);
-                }, { once: true });
+                    console.log('Model viewer display set to:', modelViewer.style.display);
+                    modelViewer.removeEventListener('progress', handleProgress);
+                    modelViewer.removeEventListener('load', handleLoad);
+                    modelViewer.removeEventListener('error', handleError);
+                    clearTimeout(timeout);
+                };
                 
-                // Handle errors with timeout
-                const timeout = setTimeout(() => {
-                    loadingIndicator.innerHTML = '<div class="alert alert-warning">Model is taking longer than expected. Large files may take up to 1 minute...</div>';
-                }, 15000);
-                
-                modelViewer.addEventListener('error', function onError(e) {
+                // Error handler
+                const handleError = (e) => {
+                    console.error('Model loading error:', e);
                     clearTimeout(timeout);
                     loadingIndicator.style.display = 'none';
                     modelViewer.style.display = 'none';
                     notAvailable.style.display = 'block';
-                    notAvailable.innerHTML = '<h5>❌ Failed to Load Model</h5><p>The file may be too large or corrupted. Try a smaller model.</p>';
-                    modelViewer.removeEventListener('error', onError);
-                }, { once: true });
+                    notAvailable.innerHTML = '<h5>❌ Failed to Load Model</h5><p>The model could not be loaded. Try refreshing the page.</p>';
+                    modelViewer.removeEventListener('progress', handleProgress);
+                    modelViewer.removeEventListener('load', handleLoad);
+                    modelViewer.removeEventListener('error', handleError);
+                };
+                
+                // Add event listeners
+                modelViewer.addEventListener('progress', handleProgress);
+                modelViewer.addEventListener('load', handleLoad, { once: true });
+                modelViewer.addEventListener('error', handleError, { once: true });
+                
+                // Timeout warning
+                const timeout = setTimeout(() => {
+                    if (loadingIndicator.style.display !== 'none') {
+                        loadingIndicator.innerHTML = '<div class="alert alert-warning">Model is taking longer than expected... Please wait</div>';
+                    }
+                }, 10000);
+                
+                // Set model source directly
+                modelViewer.src = modelUrl;
+                console.log('Model source set to:', modelViewer.src);
             } else {
                 // No model available
                 loadingIndicator.style.display = 'none';
