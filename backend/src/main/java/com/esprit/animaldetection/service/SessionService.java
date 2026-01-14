@@ -3,6 +3,9 @@ package com.esprit.animaldetection.service;
 import com.esprit.animaldetection.model.User;
 import com.esprit.animaldetection.model.UserGameProgress;
 import com.esprit.animaldetection.model.UserSession;
+import com.esprit.animaldetection.repository.UserGameProgressRepository;
+import com.esprit.animaldetection.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -10,12 +13,14 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@RequiredArgsConstructor
 public class SessionService {
     
-    // In-memory storage (replace with database in production)
-    private final Map<String, User> users = new ConcurrentHashMap<>();
+    private final UserRepository userRepository;
+    private final UserGameProgressRepository gameProgressRepository;
+    
+    // In-memory storage for sessions only
     private final Map<String, UserSession> sessions = new ConcurrentHashMap<>();
-    private final Map<String, UserGameProgress> gameProgress = new ConcurrentHashMap<>();
     
     // Session expiration time in hours
     private static final int SESSION_EXPIRATION_HOURS = 24;
@@ -25,20 +30,21 @@ public class SessionService {
      */
     public User registerUser(String username, String email, String password) {
         // Check if username already exists
-        if (users.values().stream().anyMatch(u -> u.getUsername().equals(username))) {
+        if (userRepository.existsByUsername(username)) {
             throw new RuntimeException("Username already exists");
         }
         
         // Check if email already exists
-        if (users.values().stream().anyMatch(u -> u.getEmail().equals(email))) {
+        if (userRepository.existsByEmail(email)) {
             throw new RuntimeException("Email already exists");
         }
         
         User user = new User(username, email, password);
-        users.put(user.getId(), user);
+        user = userRepository.save(user);
         
-        // Initialize game progress for new user
-        gameProgress.put(user.getId(), new UserGameProgress(user.getId()));
+        // Initialize game progress for new user in database
+        UserGameProgress progress = new UserGameProgress(user.getId());
+        gameProgressRepository.save(progress);
         
         return user;
     }
@@ -47,13 +53,13 @@ public class SessionService {
      * Login user and create session
      */
     public UserSession login(String username, String password) {
-        User user = users.values().stream()
-            .filter(u -> u.getUsername().equals(username) && u.getPassword().equals(password))
-            .findFirst()
+        User user = userRepository.findByUsername(username)
+            .filter(u -> u.getPassword().equals(password))
             .orElseThrow(() -> new RuntimeException("Invalid username or password"));
         
         // Update last login
         user.setLastLogin(LocalDateTime.now());
+        userRepository.save(user);
         
         // Create new session
         String sessionId = UUID.randomUUID().toString();
@@ -98,7 +104,8 @@ public class SessionService {
      */
     public User getUserBySession(String sessionId) {
         UserSession session = validateSession(sessionId);
-        return users.get(session.getUserId());
+        return userRepository.findById(session.getUserId())
+            .orElseThrow(() -> new RuntimeException("User not found"));
     }
     
     /**
@@ -106,7 +113,11 @@ public class SessionService {
      */
     public UserGameProgress getGameProgress(String sessionId) {
         UserSession session = validateSession(sessionId);
-        return gameProgress.computeIfAbsent(session.getUserId(), UserGameProgress::new);
+        return gameProgressRepository.findById(session.getUserId())
+            .orElseGet(() -> {
+                UserGameProgress newProgress = new UserGameProgress(session.getUserId());
+                return gameProgressRepository.save(newProgress);
+            });
     }
     
     /**
@@ -116,8 +127,7 @@ public class SessionService {
         UserSession session = validateSession(sessionId);
         progress.setUserId(session.getUserId());
         progress.setLastUpdated(LocalDateTime.now());
-        gameProgress.put(session.getUserId(), progress);
-        return progress;
+        return gameProgressRepository.save(progress);
     }
     
     /**
@@ -126,18 +136,18 @@ public class SessionService {
     public List<Map<String, Object>> getLeaderboard() {
         List<Map<String, Object>> leaderboard = new ArrayList<>();
         
-        gameProgress.values().stream()
-            .sorted((a, b) -> Integer.compare(b.getPoints(), a.getPoints()))
+        gameProgressRepository.findLeaderboard().stream()
             .limit(10)
             .forEach(progress -> {
-                User user = users.get(progress.getUserId());
-                Map<String, Object> entry = new HashMap<>();
-                entry.put("username", user.getUsername());
-                entry.put("points", progress.getPoints());
-                entry.put("level", progress.getLevel());
-                entry.put("collected", progress.getCollectedAnimals().size());
-                entry.put("badges", progress.getBadges().size());
-                leaderboard.add(entry);
+                userRepository.findById(progress.getUserId()).ifPresent(user -> {
+                    Map<String, Object> entry = new HashMap<>();
+                    entry.put("username", user.getUsername());
+                    entry.put("points", progress.getPoints());
+                    entry.put("level", progress.getLevel());
+                    entry.put("collected", progress.getCollectedAnimals().size());
+                    entry.put("badges", progress.getBadges().size());
+                    leaderboard.add(entry);
+                });
             });
         
         return leaderboard;
