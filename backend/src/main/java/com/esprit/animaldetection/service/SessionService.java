@@ -18,6 +18,7 @@ public class SessionService {
     
     private final UserRepository userRepository;
     private final UserGameProgressRepository gameProgressRepository;
+    private final UserProfileService userProfileService;
     
     // In-memory storage for sessions only
     private final Map<String, UserSession> sessions = new ConcurrentHashMap<>();
@@ -60,6 +61,9 @@ public class SessionService {
         // Update last login
         user.setLastLogin(LocalDateTime.now());
         userRepository.save(user);
+        
+        // Track session start in user profile
+        userProfileService.trackSessionStart(user.getId());
         
         // Create new session
         String sessionId = UUID.randomUUID().toString();

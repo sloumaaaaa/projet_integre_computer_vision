@@ -320,6 +320,9 @@
                 </div>
             </div>
             <div>
+                <button id="profileBtn" class="btn btn-outline-secondary btn-sm hidden" onclick="showProfileModal()">
+                    ⚙️ Profile
+                </button>
                 <button id="refreshProgressBtn" class="btn btn-outline-info btn-sm hidden" onclick="loadGameProgressFromServer(true)" title="Refresh progress from database">
                     🔄 Refresh
                 </button>
@@ -981,7 +984,9 @@
         // ============================================
         
         const SESSION_API = 'http://localhost:8081/api/session';
+        const PROFILE_API = 'http://localhost:8081/api/profile';
         let currentSession = null;
+        let sessionStartTime = null;
         
         // Load session on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -1024,13 +1029,18 @@
                 document.getElementById('loggedInMode').classList.remove('hidden');
                 document.getElementById('logoutBtn').classList.remove('hidden');
                 document.getElementById('refreshProgressBtn').classList.remove('hidden');
+                document.getElementById('profileBtn').classList.remove('hidden');
                 document.getElementById('usernameDisplay').textContent = currentSession.username;
                 document.getElementById('userAvatar').textContent = currentSession.username.charAt(0).toUpperCase();
+                
+                // Start tracking time
+                sessionStartTime = Date.now();
             } else {
                 document.getElementById('guestMode').classList.remove('hidden');
                 document.getElementById('loggedInMode').classList.add('hidden');
                 document.getElementById('logoutBtn').classList.add('hidden');
                 document.getElementById('refreshProgressBtn').classList.add('hidden');
+                document.getElementById('profileBtn').classList.add('hidden');
             }
         }
         
@@ -1124,6 +1134,25 @@
         
         async function logout() {
             if (confirm('Are you sure you want to logout?')) {
+                // Track time before logout
+                if (sessionStartTime && currentSession) {
+                    const timeSpent = Math.floor((Date.now() - sessionStartTime) / 60000); // minutes
+                    if (timeSpent > 0) {
+                        try {
+                            await fetch(`${PROFILE_API}/track-time`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Session-Id': currentSession.sessionId
+                                },
+                                body: JSON.stringify({ minutes: timeSpent })
+                            });
+                        } catch (error) {
+                            console.error('Track time error:', error);
+                        }
+                    }
+                }
+                
                 try {
                     await fetch(`${SESSION_API}/logout`, {
                         method: 'POST',
@@ -1135,6 +1164,7 @@
                 
                 localStorage.removeItem('sessionId');
                 currentSession = null;
+                sessionStartTime = null;
                 updateSessionUI();
                 
                 // Reset to guest mode
@@ -1258,6 +1288,109 @@
                 loadLeaderboard();
             }
         }, 30000); // Refresh every 30 seconds
+        
+        // Profile Management
+        function showProfileModal() {
+            loadUserProfile();
+            document.getElementById('profileModal').classList.add('show');
+        }
+        
+        function closeProfileModal() {
+            document.getElementById('profileModal').classList.remove('show');
+        }
+        
+        async function loadUserProfile() {
+            if (!currentSession) return;
+            
+            try {
+                const response = await fetch(PROFILE_API, {
+                    headers: { 'Session-Id': currentSession.sessionId }
+                });
+                const profile = await response.json();
+                
+                // Populate form
+                if (profile.age) document.getElementById('profileAge').value = profile.age;
+                if (profile.phoneNumber) document.getElementById('profilePhone').value = profile.phoneNumber;
+                if (profile.occupation) document.getElementById('profileOccupation').value = profile.occupation;
+                if (profile.country) document.getElementById('profileCountry').value = profile.country;
+                if (profile.city) document.getElementById('profileCity').value = profile.city;
+                if (profile.preferredLanguage) document.getElementById('profileLanguage').value = profile.preferredLanguage;
+                if (profile.marketingConsent !== null) document.getElementById('profileMarketingConsent').checked = profile.marketingConsent;
+                
+            } catch (error) {
+                console.error('Load profile error:', error);
+            }
+        }
+        
+        async function handleProfileUpdate(event) {
+            event.preventDefault();
+            if (!currentSession) return;
+            
+            const profileData = {
+                age: parseInt(document.getElementById('profileAge').value) || null,
+                phoneNumber: document.getElementById('profilePhone').value || null,
+                occupation: document.getElementById('profileOccupation').value || null,
+                country: document.getElementById('profileCountry').value || null,
+                city: document.getElementById('profileCity').value || null,
+                preferredLanguage: document.getElementById('profileLanguage').value || null,
+                marketingConsent: document.getElementById('profileMarketingConsent').checked,
+                deviceType: navigator.platform || 'Unknown',
+                browserInfo: navigator.userAgent || 'Unknown'
+            };
+            
+            try {
+                const response = await fetch(PROFILE_API, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Session-Id': currentSession.sessionId
+                    },
+                    body: JSON.stringify(profileData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('profileSuccess').textContent = data.message;
+                    document.getElementById('profileSuccess').classList.remove('hidden');
+                    document.getElementById('profileError').classList.add('hidden');
+                    
+                    setTimeout(() => {
+                        closeProfileModal();
+                        document.getElementById('profileSuccess').classList.add('hidden');
+                    }, 2000);
+                } else {
+                    document.getElementById('profileError').textContent = data.error || 'Update failed';
+                    document.getElementById('profileError').classList.remove('hidden');
+                }
+            } catch (error) {
+                document.getElementById('profileError').textContent = 'Connection error';
+                document.getElementById('profileError').classList.remove('hidden');
+            }
+        }
+        
+        // Track time spent periodically (every 5 minutes)
+        setInterval(async () => {
+            if (currentSession && sessionStartTime) {
+                const timeSpent = Math.floor((Date.now() - sessionStartTime) / 60000);
+                if (timeSpent > 0 && timeSpent % 5 === 0) {
+                    try {
+                        await fetch(`${PROFILE_API}/track-time`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Session-Id': currentSession.sessionId
+                            },
+                            body: JSON.stringify({ minutes: 5 })
+                        });
+                        sessionStartTime = Date.now(); // Reset counter
+                    } catch (error) {
+                        console.error('Track time error:', error);
+                    }
+                }
+            }
+        }, 300000); // Every 5 minutes
+
     </script>
     
     <!-- Login Modal -->
@@ -1314,5 +1447,61 @@
             </p>
         </div>
     </div>
+
+    <!-- Profile Modal -->
+    <div id="profileModal" class="modal">
+        <div class="modal-content">
+            <h2 class="text-center mb-4">👤 Edit Profile</h2>
+            <form onsubmit="handleProfileUpdate(event)">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Age</label>
+                        <input type="number" class="form-control" id="profileAge" min="1" max="120">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="profilePhone">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Occupation</label>
+                    <input type="text" class="form-control" id="profileOccupation" placeholder="Student, Engineer, Teacher, etc.">
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Country</label>
+                        <input type="text" class="form-control" id="profileCountry">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">City</label>
+                        <input type="text" class="form-control" id="profileCity">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Preferred Language</label>
+                    <select class="form-control" id="profileLanguage">
+                        <option value="">Select...</option>
+                        <option value="en">English</option>
+                        <option value="fr">French</option>
+                        <option value="ar">Arabic</option>
+                        <option value="es">Spanish</option>
+                    </select>
+                </div>
+                <div class="mb-3 form-check">
+                    <input type="checkbox" class="form-check-input" id="profileMarketingConsent">
+                    <label class="form-check-label" for="profileMarketingConsent">
+                        I agree to receive updates and marketing communications
+                    </label>
+                </div>
+                <div id="profileError" class="alert alert-danger hidden"></div>
+                <div id="profileSuccess" class="alert alert-success hidden"></div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">Save Profile</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeProfileModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </body>
 </html>
