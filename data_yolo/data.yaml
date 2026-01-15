@@ -1,6 +1,6 @@
-train: data_yolo/train/images
-val: data_yolo/valid/images
-test: data_yolo/test/images
+train: train/images
+val: valid/images
+test: test/images
 
 nc: 5
 names: ['Elephant', 'Pig', 'Tiger', 'lion', 'wolf']
