@@ -15,7 +15,7 @@ on:
       epochs:
         description: 'Number of training epochs'
         required: false
-        default: '50'
+        default: '1'
       batch_size:
         description: 'Batch size'
         required: false
@@ -49,7 +49,7 @@ jobs:
       run: |
         cd mlops
         python train_with_mlflow.py \
-          --epochs ${{ github.event.inputs.epochs || '50' }} \
+          --epochs ${{ github.event.inputs.epochs || '1' }} \
           --batch ${{ github.event.inputs.batch_size || '16' }} \
           --model yolov8n.pt \
           --project ../output \

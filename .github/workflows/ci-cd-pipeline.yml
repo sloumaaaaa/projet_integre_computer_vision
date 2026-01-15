@@ -78,7 +78,7 @@ jobs:
       - name: 🏋️ Train model
         run: |
           cd mlops
-          python train_with_mlflow.py --epochs 10 --batch 8 --name ci_test
+          python train_with_mlflow.py --epochs 1 --batch 8 --name ci_test
       
       - name: 📊 Upload training results
         uses: actions/upload-artifact@v4
