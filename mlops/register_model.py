@@ -1,7 +1,7 @@
 import mlflow
 from mlflow.tracking import MlflowClient
 
-MLFLOW_TRACKING_URI = "file:./mlflow/mlflow.db"
+MLFLOW_TRACKING_URI = "sqlite:///./mlflow.db"
 
 def register_model(run_id, model_name="yolov8-animal-detection", stage="Production"):
     """

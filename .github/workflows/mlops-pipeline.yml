@@ -43,14 +43,9 @@ jobs:
         pip install -r mlops/requirements.txt
         pip install pytest pytest-cov
     
-    - name: 📁 Create MLflow directories
-      run: |
-        mkdir -p mlops/mlflow/mlruns
-        mkdir -p output
-    
     - name: 🏋️ Train model with MLflow
       env:
-        MLFLOW_TRACKING_URI: file:./mlflow/mlflow.db
+        MLFLOW_TRACKING_URI: sqlite:///./mlflow.db
       run: |
         cd mlops
         python train_with_mlflow.py \
