@@ -1,0 +1,31 @@
+train:
+  epochs: 50
+  batch: 16
+  imgsz: 640
+  model: yolov8n.pt
+  optimizer: SGD
+  lr0: 0.01
+  momentum: 0.937
+  weight_decay: 0.0005
+
+data:
+  augmentation: true
+  mosaic: 1.0
+  mixup: 0.0
+  copy_paste: 0.0
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+
+mlflow:
+  tracking_uri: sqlite:///mlflow/mlflow.db
+  experiment_name: animal-detection-yolov8
+  artifact_location: ./mlflow/mlruns
+
+dvc:
+  remote: gdrive
+  gdrive_folder: animal-detection-dvc

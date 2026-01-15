@@ -1,0 +1,120 @@
+name: MLOps - Train and Track Model
+
+on:
+  push:
+    branches: [ main, develop, feature/mlops ]
+    paths:
+      - 'data/**'
+      - 'mlops/**'
+      - 'yolov8_train_eval.py'
+      - '.github/workflows/mlops-pipeline.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      epochs:
+        description: 'Number of training epochs'
+        required: false
+        default: '50'
+      batch_size:
+        description: 'Batch size'
+        required: false
+        default: '16'
+
+jobs:
+  train-and-track:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+    
+    - name: 📦 Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r mlops/requirements.txt
+        pip install pytest pytest-cov
+    
+    - name: 🔧 Setup DVC
+      uses: iterative/setup-dvc@v1
+    
+    - name: 📊 Pull data with DVC
+      run: |
+        cd mlops
+        dvc pull || echo "No remote configured, using local data"
+    
+    - name: 🏋️ Train model with MLflow
+      env:
+        MLFLOW_TRACKING_URI: sqlite:///mlflow/mlflow.db
+      run: |
+        cd mlops
+        python train_with_mlflow.py \
+          --epochs ${{ github.event.inputs.epochs || '50' }} \
+          --batch ${{ github.event.inputs.batch_size || '16' }} \
+          --model yolov8n.pt \
+          --project ../output \
+          --name yolov8_ci_run
+    
+    - name: 📈 Extract metrics
+      id: metrics
+      run: |
+        cd output/yolov8_ci_run
+        if [ -f results.csv ]; then
+          # Get last line metrics
+          FINAL_MAP=$(tail -n 1 results.csv | cut -d',' -f8)
+          echo "map50=$FINAL_MAP" >> $GITHUB_OUTPUT
+          echo "✅ Final mAP50: $FINAL_MAP"
+        fi
+    
+    - name: 💾 Upload model artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: trained-model
+        path: |
+          output/yolov8_ci_run/weights/best.pt
+          output/yolov8_ci_run/results.csv
+          output/yolov8_ci_run/*.png
+        retention-days: 30
+    
+    - name: 📊 Upload MLflow artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: mlflow-tracking
+        path: mlops/mlflow/
+        retention-days: 30
+    
+    - name: 📝 Comment PR with results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const map50 = '${{ steps.metrics.outputs.map50 }}';
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: `## 🤖 ML Model Training Results\n\n✅ Training completed successfully!\n\n**Metrics:**\n- mAP50: ${map50}\n- Epochs: ${{ github.event.inputs.epochs || '50' }}\n- Batch Size: ${{ github.event.inputs.batch_size || '16' }}\n\n[View Artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+          })
+    
+    - name: ✅ Validate model performance
+      run: |
+        cd mlops
+        python -c "
+        import pandas as pd
+        df = pd.read_csv('../output/yolov8_ci_run/results.csv')
+        final_map = df.iloc[-1]['metrics/mAP50(B)']
+        print(f'Final mAP50: {final_map}')
+        if final_map < 0.3:
+            print('⚠️ Warning: Model performance below threshold')
+            exit(1)
+        else:
+            print('✅ Model performance acceptable')
+        "

@@ -1,0 +1,45 @@
+schema: '2.0'
+stages:
+  prepare_data:
+    cmd: python prepare_data.py
+    deps:
+      - ../data/train
+      - ../data/valid
+    params:
+      - data.yaml:
+          - nc
+          - names
+    outs:
+      - preprocessed_data/:
+          cache: true
+  
+  train:
+    cmd: python train_with_mlflow.py --data ../data.yaml --epochs ${train.epochs} --batch ${train.batch}
+    deps:
+      - preprocessed_data/
+      - ../data.yaml
+    params:
+      - train.epochs
+      - train.batch
+      - train.imgsz
+      - train.model
+    metrics:
+      - ../output/yolov8_mlflow_exp/results.csv:
+          cache: false
+    outs:
+      - ../output/yolov8_mlflow_exp/weights/best.pt:
+          cache: true
+  
+  evaluate:
+    cmd: python evaluate_model.py --weights ../output/yolov8_mlflow_exp/weights/best.pt
+    deps:
+      - ../output/yolov8_mlflow_exp/weights/best.pt
+      - ../data/valid
+    metrics:
+      - evaluation_metrics.json:
+          cache: false
+    plots:
+      - confusion_matrix.png:
+          cache: false
+      - pr_curve.png:
+          cache: false

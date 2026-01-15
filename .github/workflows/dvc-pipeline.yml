@@ -1,0 +1,77 @@
+name: DVC Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'mlops/dvc.yaml'
+      - 'mlops/params.yaml'
+      - 'data/**'
+  workflow_dispatch:
+
+jobs:
+  dvc-repro:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: 📦 Install dependencies
+      run: |
+        pip install -r mlops/requirements.txt
+    
+    - name: 🔧 Setup DVC
+      uses: iterative/setup-dvc@v1
+    
+    - name: 🔐 Configure DVC remote (if using cloud storage)
+      run: |
+        # Uncomment and configure your remote storage
+        # dvc remote add -d myremote gdrive://your-folder-id
+        # Or use S3, Azure, etc.
+        echo "DVC remote configuration skipped (using local storage)"
+    
+    - name: 📊 Pull DVC data
+      run: |
+        cd mlops
+        dvc pull || echo "No remote configured"
+    
+    - name: ▶️ Run DVC pipeline
+      run: |
+        cd mlops
+        dvc repro
+    
+    - name: 📈 Show metrics
+      run: |
+        cd mlops
+        dvc metrics show
+    
+    - name: 📊 Publish DVC metrics
+      uses: iterative/setup-cml@v1
+      with:
+        version: latest
+    
+    - name: 💾 Commit DVC changes
+      run: |
+        git config --local user.email "github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git add mlops/dvc.lock mlops/*.dvc
+        git diff --staged --quiet || git commit -m "Update DVC pipeline [skip ci]"
+    
+    - name: 📤 Push DVC data
+      run: |
+        cd mlops
+        dvc push || echo "DVC push skipped (no remote configured)"
+    
+    - name: 🚀 Push changes to repo
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
