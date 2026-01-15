@@ -31,17 +31,20 @@ jobs:
     - name: 🔧 Setup DVC
       uses: iterative/setup-dvc@v1
     
-    - name: 🔐 Configure DVC remote (if using cloud storage)
+    - name: 🔐 Initialize DVC (if not already done)
       run: |
-        # Uncomment and configure your remote storage
-        # dvc remote add -d myremote gdrive://your-folder-id
-        # Or use S3, Azure, etc.
-        echo "DVC remote configuration skipped (using local storage)"
+        cd mlops
+        if [ ! -d .dvc ]; then
+          dvc init --no-scm
+          echo "DVC initialized"
+        else
+          echo "DVC already initialized"
+        fi
     
     - name: 📊 Pull DVC data
       run: |
         cd mlops
-        dvc pull || echo "No remote configured"
+        dvc pull || echo "No remote configured, using local data"
     
     - name: ▶️ Run DVC pipeline
       run: |

@@ -6,7 +6,7 @@ import yaml
 from pathlib import Path
 
 # MLflow configuration
-MLFLOW_TRACKING_URI = "sqlite:///mlflow/mlflow.db"
+MLFLOW_TRACKING_URI = "file:./mlflow/mlflow.db"
 EXPERIMENT_NAME = "animal-detection-yolov8"
 
 def setup_mlflow():

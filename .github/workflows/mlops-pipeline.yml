@@ -43,17 +43,14 @@ jobs:
         pip install -r mlops/requirements.txt
         pip install pytest pytest-cov
     
-    - name: 🔧 Setup DVC
-      uses: iterative/setup-dvc@v1
-    
-    - name: 📊 Pull data with DVC
+    - name: 📁 Create MLflow directories
       run: |
-        cd mlops
-        dvc pull || echo "No remote configured, using local data"
+        mkdir -p mlops/mlflow/mlruns
+        mkdir -p output
     
     - name: 🏋️ Train model with MLflow
       env:
-        MLFLOW_TRACKING_URI: sqlite:///mlflow/mlflow.db
+        MLFLOW_TRACKING_URI: file:./mlflow/mlflow.db
       run: |
         cd mlops
         python train_with_mlflow.py \
