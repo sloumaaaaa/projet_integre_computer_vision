@@ -54,7 +54,7 @@ jobs:
           mvn clean package -DskipTests
       
       - name: 📦 Upload artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: backend-jar
           path: backend/target/*.jar
@@ -81,7 +81,7 @@ jobs:
           python train_with_mlflow.py --epochs 10 --batch 8 --name ci_test
       
       - name: 📊 Upload training results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: training-results
           path: output/ci_test/
@@ -104,7 +104,7 @@ jobs:
         run: pip install mlflow
       
       - name: 📥 Download training artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: training-results
           path: output/ci_test/
@@ -152,7 +152,7 @@ jobs:
         run: pip install -r mlops/requirements.txt
       
       - name: 📥 Download backend JAR
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: backend-jar
           path: backend/target/
