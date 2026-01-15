@@ -7,6 +7,7 @@ on:
       - 'mlops/dvc.yaml'
       - 'mlops/params.yaml'
       - 'data/**'
+      - 'data_yolo/**'
   workflow_dispatch:
 
 jobs:

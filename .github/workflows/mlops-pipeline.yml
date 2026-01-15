@@ -5,6 +5,7 @@ on:
     branches: [ main, develop, feature/mlops ]
     paths:
       - 'data/**'
+      - 'data_yolo/**'
       - 'mlops/**'
       - 'yolov8_train_eval.py'
       - '.github/workflows/mlops-pipeline.yml'
