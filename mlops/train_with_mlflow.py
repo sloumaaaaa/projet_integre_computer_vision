@@ -116,7 +116,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description='Train YOLOv8 with MLflow tracking')
-    parser.add_argument('--data', type=str, default='../data.yaml', help='Path to data.yaml')
+    parser.add_argument('--data', type=str, default='../data_yolo/data.yaml', help='Path to data.yaml')
     parser.add_argument('--model', type=str, default='yolov8n.pt', help='YOLOv8 model variant')
     parser.add_argument('--epochs', type=int, default=50, help='Number of epochs')
     parser.add_argument('--imgsz', type=int, default=640, help='Image size')

@@ -3,10 +3,10 @@ stages:
   prepare_data:
     cmd: python prepare_data.py
     deps:
-      - ../data/train
-      - ../data/valid
+      - ../data_yolo/train
+      - ../data_yolo/valid
     params:
-      - data.yaml:
+      - data_yolo/data.yaml:
           - nc
           - names
     outs:
@@ -14,10 +14,10 @@ stages:
           cache: true
   
   train:
-    cmd: python train_with_mlflow.py --data ../data.yaml --epochs ${train.epochs} --batch ${train.batch}
+    cmd: python train_with_mlflow.py --data ../data_yolo/data.yaml --epochs ${train.epochs} --batch ${train.batch}
     deps:
       - preprocessed_data/
-      - ../data.yaml
+      - ../data_yolo/data.yaml
     params:
       - train.epochs
       - train.batch
@@ -34,7 +34,7 @@ stages:
     cmd: python evaluate_model.py --weights ../output/yolov8_mlflow_exp/weights/best.pt
     deps:
       - ../output/yolov8_mlflow_exp/weights/best.pt
-      - ../data/valid
+      - ../data_yolo/valid
     metrics:
       - evaluation_metrics.json:
           cache: false

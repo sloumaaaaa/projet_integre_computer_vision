@@ -9,6 +9,7 @@ train:
   weight_decay: 0.0005
 
 data:
+  dataset: ../data_yolo/data.yaml
   augmentation: true
   mosaic: 1.0
   mixup: 0.0
