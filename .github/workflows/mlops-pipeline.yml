@@ -59,12 +59,23 @@ jobs:
     - name: 📈 Extract metrics
       id: metrics
       run: |
-        cd output/yolov8_ci_run
-        if [ -f results.csv ]; then
-          # Get last line metrics
-          FINAL_MAP=$(tail -n 1 results.csv | cut -d',' -f8)
+        # Find the actual output directory (YOLOv8 may create it in different locations)
+        if [ -d "output/yolov8_ci_run" ]; then
+          RESULTS_DIR="output/yolov8_ci_run"
+        elif [ -d "mlops/runs/detect/yolov8_ci_run" ]; then
+          RESULTS_DIR="mlops/runs/detect/yolov8_ci_run"
+        else
+          echo "⚠️ Results directory not found, searching..."
+          RESULTS_DIR=$(find . -name "yolov8_ci_run" -type d | head -n 1)
+        fi
+        
+        if [ -f "$RESULTS_DIR/results.csv" ]; then
+          FINAL_MAP=$(tail -n 1 "$RESULTS_DIR/results.csv" | cut -d',' -f8)
           echo "map50=$FINAL_MAP" >> $GITHUB_OUTPUT
           echo "✅ Final mAP50: $FINAL_MAP"
+          echo "✅ Results found in: $RESULTS_DIR"
+        else
+          echo "⚠️ No results.csv found"
         fi
     
     - name: 💾 Upload model artifacts
@@ -72,10 +83,13 @@ jobs:
       with:
         name: trained-model
         path: |
-          output/yolov8_ci_run/weights/best.pt
-          output/yolov8_ci_run/results.csv
-          output/yolov8_ci_run/*.png
+          output/**/weights/best.pt
+          output/**/results.csv
+          output/**/*.png
+          mlops/runs/detect/**/weights/best.pt
+          mlops/runs/detect/**/results.csv
         retention-days: 30
+        if-no-files-found: warn
     
     - name: 📊 Upload MLflow artifacts
       uses: actions/upload-artifact@v4
