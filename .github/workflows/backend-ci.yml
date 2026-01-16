@@ -67,3 +67,4 @@ jobs:
         name: backend-jar
         path: backend/target/*.jar
         retention-days: 30
+        if-no-files-found: error

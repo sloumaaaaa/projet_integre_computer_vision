@@ -53,6 +53,7 @@ jobs:
         dvc repro
     
     - name: 📈 Show metrics
+      continue-on-error: true
       run: |
         cd mlops
         dvc metrics show

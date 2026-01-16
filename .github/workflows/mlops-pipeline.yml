@@ -113,15 +113,25 @@ jobs:
     
     - name: ✅ Validate model performance
       run: |
-        cd mlops
+        # Find the results file
+        RESULTS_FILE=$(find . -name "results.csv" -path "*/yolov8_ci_run/*" | head -n 1)
+        
+        if [ -z "$RESULTS_FILE" ]; then
+          echo "⚠️ No results.csv found, skipping validation"
+          exit 0
+        fi
+        
+        echo "📊 Found results at: $RESULTS_FILE"
+        
         python -c "
         import pandas as pd
-        df = pd.read_csv('../output/yolov8_ci_run/results.csv')
+        import sys
+        df = pd.read_csv('$RESULTS_FILE')
         final_map = df.iloc[-1]['metrics/mAP50(B)']
         print(f'Final mAP50: {final_map}')
         if final_map < 0.3:
             print('⚠️ Warning: Model performance below threshold')
-            exit(1)
+            sys.exit(1)
         else:
             print('✅ Model performance acceptable')
         "

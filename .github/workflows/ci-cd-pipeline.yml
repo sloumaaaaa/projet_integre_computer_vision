@@ -58,6 +58,7 @@ jobs:
         with:
           name: backend-jar
           path: backend/target/*.jar
+          if-no-files-found: error
 
   ml-training:
     name: 🤖 ML Model Training
@@ -84,7 +85,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: training-results
-          path: output/ci_test/
+          path: |
+            output/**/
+            mlops/runs/detect/**/
+          if-no-files-found: warn
 
   model-registry:
     name: 📚 Register Model
@@ -107,7 +111,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: training-results
-          path: output/ci_test/
+          path: ./artifacts/
       
       - name: 📝 List registered models
         run: |
