@@ -53,29 +53,36 @@ jobs:
           --epochs ${{ github.event.inputs.epochs || '1' }} \
           --batch ${{ github.event.inputs.batch_size || '16' }} \
           --model yolov8n.pt \
-          --project ../output \
+          --project $PWD/../output \
           --name yolov8_ci_run
+    
+    - name: 🔍 Locate training results
+      run: |
+        echo "📂 Searching for training output..."
+        find . -name "yolov8_ci_run" -type d 2>/dev/null || true
+        echo "📂 Searching for results.csv..."
+        find . -name "results.csv" 2>/dev/null || true
     
     - name: 📈 Extract metrics
       id: metrics
       run: |
-        # Find the actual output directory (YOLOv8 may create it in different locations)
-        if [ -d "output/yolov8_ci_run" ]; then
-          RESULTS_DIR="output/yolov8_ci_run"
-        elif [ -d "mlops/runs/detect/yolov8_ci_run" ]; then
-          RESULTS_DIR="mlops/runs/detect/yolov8_ci_run"
-        else
-          echo "⚠️ Results directory not found, searching..."
-          RESULTS_DIR=$(find . -name "yolov8_ci_run" -type d | head -n 1)
+        # Search for results.csv anywhere
+        RESULTS_FILE=$(find . -name "results.csv" -path "*/yolov8_ci_run/*" 2>/dev/null | head -n 1)
+        
+        if [ -z "$RESULTS_FILE" ]; then
+          echo "⚠️ No results.csv found in yolov8_ci_run directory"
+          # Try to find any results.csv as fallback
+          RESULTS_FILE=$(find . -name "results.csv" 2>/dev/null | head -n 1)
         fi
         
-        if [ -f "$RESULTS_DIR/results.csv" ]; then
-          FINAL_MAP=$(tail -n 1 "$RESULTS_DIR/results.csv" | cut -d',' -f8)
+        if [ -n "$RESULTS_FILE" ] && [ -f "$RESULTS_FILE" ]; then
+          echo "✅ Results found at: $RESULTS_FILE"
+          FINAL_MAP=$(tail -n 1 "$RESULTS_FILE" | cut -d',' -f8)
           echo "map50=$FINAL_MAP" >> $GITHUB_OUTPUT
           echo "✅ Final mAP50: $FINAL_MAP"
-          echo "✅ Results found in: $RESULTS_DIR"
         else
-          echo "⚠️ No results.csv found"
+          echo "⚠️ No results.csv found anywhere - training may have failed"
+          echo "map50=0.0" >> $GITHUB_OUTPUT
         fi
     
     - name: 💾 Upload model artifacts
