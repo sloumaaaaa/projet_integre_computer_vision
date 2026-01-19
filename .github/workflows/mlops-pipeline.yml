@@ -95,8 +95,11 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: mlflow-tracking
-        path: mlops/mlflow/
+        path: |
+          mlops/mlflow.db
+          mlops/mlruns/
         retention-days: 30
+        if-no-files-found: warn
     
     - name: 📝 Comment PR with results
       if: github.event_name == 'pull_request'
