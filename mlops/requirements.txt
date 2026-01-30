@@ -1,0 +1,9 @@
+mlflow
+dvc
+dvc-gdrive
+ultralytics
+pyyaml
+pandas
+matplotlib
+seaborn
+scikit-learn

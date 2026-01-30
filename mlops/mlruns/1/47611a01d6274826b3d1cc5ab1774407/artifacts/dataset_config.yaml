@@ -1,0 +1,9 @@
+names:
+- Elephant
+- lion
+- Pig
+- Tiger
+- wolf
+nc: 5
+train: data/train
+val: data/valid

@@ -1,0 +1,226 @@
+<div class="ar-container">
+  <!-- Mode Selector -->
+  <div class="mode-selector">
+    <button 
+      class="mode-btn" 
+      [class.active]="arMode === 'detection'"
+      (click)="switchMode('detection')">
+      🔍 Detection Mode
+    </button>
+    <button 
+      class="mode-btn" 
+      [class.active]="arMode === 'scavenger'"
+      (click)="switchMode('scavenger')">
+      🎮 Scavenger Hunt
+    </button>
+  </div>
+
+  <!-- Game HUD -->
+  <div class="game-hud" *ngIf="gameState">
+    <div class="hud-item">
+      <span class="hud-label">Level</span>
+      <span class="hud-value">{{ gameState.level }}</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Points</span>
+      <span class="hud-value">{{ gameState.totalPoints }}</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Streak</span>
+      <span class="hud-value">🔥 {{ gameState.currentStreak }}</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">Collection</span>
+      <span class="hud-value">{{ gameState.collectedAnimals.size }}/{{ allAnimals.length }}</span>
+    </div>
+  </div>
+
+  <!-- Scavenger Hunt Target -->
+  <div class="target-card" *ngIf="arMode === 'scavenger' && targetAnimal">
+    <h3>🎯 Find This Animal!</h3>
+    <div class="target-info">
+      <img [src]="targetAnimal.thumbnailUrl" alt="{{ targetAnimal.displayName }}" 
+           onerror="this.src='assets/placeholder.png'">
+      <div class="target-details">
+        <h4>{{ targetAnimal.displayName }}</h4>
+        <span class="rarity-badge" [style.background-color]="getRarityColor(targetAnimal.rarity)">
+          {{ targetAnimal.rarity | titlecase }}
+        </span>
+        <p class="target-points">+{{ targetAnimal.points }} points</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Upload Section -->
+    <div class="upload-section">
+      <h2>{{ arMode === 'scavenger' ? 'Upload Image to Hunt' : 'Detect Animals' }}</h2>
+      
+      <div class="upload-form">
+        <label for="fileInput" class="file-label">
+          <span class="file-icon">📸</span>
+          <span>{{ selectedFile ? selectedFile.name : 'Choose Image' }}</span>
+        </label>
+        <input 
+          type="file" 
+          id="fileInput"
+          (change)="onFileSelected($event)"
+          accept="image/*"
+          [disabled]="loading"
+          style="display: none;">
+
+        <div class="controls">
+          <div class="control-group">
+            <label>Model:</label>
+            <select [(ngModel)]="modelType" [disabled]="loading">
+              <option *ngFor="let model of availableModels" [value]="model">
+                {{ model | titlecase }}
+              </option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label>Threshold: {{ threshold }}</label>
+            <input 
+              type="range" 
+              [(ngModel)]="threshold"
+              min="0"
+              max="1"
+              step="0.05"
+              [disabled]="loading">
+          </div>
+        </div>
+
+        <button 
+          class="detect-btn" 
+          (click)="onSubmit()"
+          [disabled]="!selectedFile || loading">
+          <span *ngIf="loading" class="spinner"></span>
+          {{ loading ? 'Processing...' : '🚀 Detect Animals' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Error Message -->
+    <div *ngIf="error" class="error-alert">
+      ⚠️ {{ error }}
+    </div>
+
+    <!-- New Discovery Notification -->
+    <div *ngIf="showNewDiscovery && lastDiscovery" class="discovery-notification"
+         [class.new-animal]="lastDiscovery.isNew">
+      <h3>{{ lastDiscovery.isNew ? '🎉 New Discovery!' : '✨ Found Again!' }}</h3>
+      <p class="discovery-name">{{ lastDiscovery.animal.displayName }}</p>
+      <p class="discovery-points">+{{ lastDiscovery.pointsEarned }} points</p>
+      <p *ngIf="lastDiscovery.isNew" class="discovery-message">Added to your collection!</p>
+    </div>
+
+    <!-- Detection Result -->
+    <div *ngIf="result && result.status === 'success'" class="result-section">
+      <h3>Detection Result</h3>
+      <img 
+        [src]="getImageUrl(result.annotatedImageUrl)" 
+        alt="Detected animals"
+        class="result-image">
+    </div>
+
+    <!-- 3D Model Viewer -->
+    <div *ngIf="show3DModel && currentAnimal" class="model-viewer-container">
+      <button class="close-btn" (click)="closeAnimalCard()">✕</button>
+      
+      <h3>{{ currentAnimal.displayName }}</h3>
+      
+      <model-viewer
+        [src]="currentAnimal.modelUrl"
+        alt="{{ currentAnimal.displayName }} 3D model"
+        ar
+        ar-modes="webxr scene-viewer quick-look"
+        camera-controls
+        touch-action="pan-y"
+        auto-rotate
+        shadow-intensity="1"
+        class="model-viewer">
+        <button slot="ar-button" class="ar-button">
+          View in AR 📱
+        </button>
+      </model-viewer>
+
+      <div class="animal-info">
+        <span class="rarity-badge" [style.background-color]="getRarityColor(currentAnimal.rarity)">
+          {{ currentAnimal.rarity | titlecase }}
+        </span>
+        <p class="animal-description">{{ currentAnimal.description }}</p>
+        
+        <div class="fun-facts">
+          <h4>🌟 Fun Facts:</h4>
+          <ul>
+            <li *ngFor="let fact of currentAnimal.funFacts">{{ fact }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Collection Gallery -->
+    <div class="collection-section" *ngIf="gameState && gameState.collectedAnimals.size > 0">
+      <h3>🏆 Your Collection</h3>
+      <div class="animal-grid">
+        <div 
+          *ngFor="let animal of allAnimals"
+          class="animal-card"
+          [class.collected]="isCollected(animal.id)"
+          [class.locked]="!isCollected(animal.id)"
+          (click)="isCollected(animal.id) ? viewAnimalDetails(animal) : null">
+          
+          <div class="card-image">
+            <img 
+              [src]="isCollected(animal.id) ? animal.thumbnailUrl : 'assets/placeholder.png'" 
+              [alt]="animal.displayName"
+              onerror="this.src='assets/placeholder.png'">
+            <span class="lock-icon" *ngIf="!isCollected(animal.id)">🔒</span>
+          </div>
+          
+          <div class="card-info">
+            <h4>{{ isCollected(animal.id) ? animal.displayName : '???' }}</h4>
+            <span 
+              class="rarity-badge" 
+              *ngIf="isCollected(animal.id)"
+              [style.background-color]="getRarityColor(animal.rarity)">
+              {{ animal.rarity }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Badges Section -->
+    <div class="badges-section" *ngIf="gameState && gameState.badges.length > 0">
+      <h3>🎖️ Badges</h3>
+      <div class="badges-grid">
+        <div 
+          *ngFor="let badge of gameState.badges"
+          class="badge-card"
+          [class.unlocked]="badge.unlocked"
+          [class.locked]="!badge.unlocked">
+          <div class="badge-icon">{{ badge.unlocked ? '🏅' : '🔒' }}</div>
+          <h4>{{ badge.name }}</h4>
+          <p>{{ badge.description }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats & Reset -->
+    <div class="stats-section" *ngIf="gameState">
+      <div class="stat-card">
+        <h4>📊 Statistics</h4>
+        <p>Total Detections: <strong>{{ gameState.totalDetections }}</strong></p>
+        <p>Best Streak: <strong>{{ gameState.bestStreak }}</strong></p>
+        <p>Collection Progress: <strong>{{ (gameState.collectedAnimals.size / allAnimals.length * 100).toFixed(0) }}%</strong></p>
+      </div>
+      
+      <button class="reset-btn" (click)="resetGame()">
+        🔄 Reset Game Progress
+      </button>
+    </div>
+  </div>
+</div>
