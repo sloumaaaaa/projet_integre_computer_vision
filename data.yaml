@@ -1,4 +1,0 @@
-train: data/train
-val: data/valid
-nc: 5
-names: ["Elephant", "lion", "Pig", "Tiger", "wolf"]
